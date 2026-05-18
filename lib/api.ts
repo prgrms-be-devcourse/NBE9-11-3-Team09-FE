@@ -284,7 +284,7 @@ export const authApi = {
 // ─────────────────────────────────────────────
 export const parkingLotApi = {
   getList: (token: string, dong?: string) =>
-    apiRequest<ApiResponse<ParkingLot[]>>(
+    apiRequest<ApiResponse<{ content: ParkingLot[], totalElements: number, totalPages: number, number: number }>>(
       `/parking-lots${dong ? `?dong=${encodeURIComponent(dong)}` : ""}`,
       { token }
     ),
