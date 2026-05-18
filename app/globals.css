@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Background: #FFFBFA */
+    --background: 348 100% 99%;
+    /* Point: #173753 */
+    --foreground: 208 57% 21%;
+    
+    --card: 348 100% 99%;
+    --card-foreground: 208 57% 21%;
+    --popover: 348 100% 99%;
+    --popover-foreground: 208 57% 21%;
+    
+    /* Point Color Used for Primary Actions */
+    --primary: 208 57% 21%;
+    --primary-foreground: 348 100% 99%;
+    
+    /* Main (Blue Bell approximate #A2B9D1) */
+    --secondary: 210 36% 73%;
+    --secondary-foreground: 208 57% 21%;
+    
+    --muted: 210 36% 73%;
+    --muted-foreground: 208 57% 21%;
+    
+    --accent: 210 36% 73%;
+    --accent-foreground: 208 57% 21%;
+    
+    --destructive: 208 57% 21%;
+    --destructive-foreground: 348 100% 99%;
+    
+    --border: 210 36% 73%;
+    --input: 210 36% 73%;
+    --ring: 208 57% 21%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
