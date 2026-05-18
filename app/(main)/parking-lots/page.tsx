@@ -38,7 +38,7 @@ export default function ParkingLotsPage() {
     setError(null);
     try {
       const response = await parkingLotApi.getList(user.accessToken, dong);
-      const lots = response.data;
+      const lots = response.data.content;
       setParkingLots(lots);
       applySort(lots, filters);
     } catch (err) {
