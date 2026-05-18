@@ -41,7 +41,7 @@ export default function ParkingLotsPage() {
     setError(null);
     try {
       const response = await parkingLotApi.getList(user.accessToken, dong);
-      const lots = response.data.content ?? [];
+      const lots = response.data.content;
       setParkingLots(lots);
       applySort(lots, filters);
     } catch (err) {
@@ -219,12 +219,11 @@ export default function ParkingLotsPage() {
         <section className="mt-5 rounded-[20px] bg-white px-5 py-6 shadow-[0_8px_24px_rgba(15,23,42,0.06)] md:px-7">
           <SearchFilters onSearch={handleSearch} onFilterChange={handleFilterChange} />
         </section>
-        {filteredLots.length > 0 && (
-            <section className="mt-5 overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-              <ParkingLotMap parkingLots={filteredLots} />
-            </section>
-          )}
-
+       {filteredLots.length > 0 && (
+          <section className="mt-5 overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+            <ParkingLotMap parkingLots={filteredLots} />
+          </section>
+        )}
         {/* ── 결과 수 + 새로고침 ── */}
         <section className="mt-5 flex items-center justify-between">
           <p className="text-[18px] font-semibold text-slate-900">

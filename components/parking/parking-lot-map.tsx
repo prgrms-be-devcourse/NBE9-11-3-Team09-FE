@@ -29,11 +29,13 @@ export function ParkingLotMap({ parkingLots }: ParkingLotMapProps) {
     if (!loaded || !mapRef.current || !window.kakao) return;
 
     window.kakao.maps.load(() => {
-      const first = parkingLots.find(
+      const validLots = parkingLots.filter(
         (lot) => lot.latitude != null && lot.longitude != null
       );
 
-      if (!first) return;
+      if (validLots.length === 0) return;
+
+      const first = validLots[0];
 
       const center = new window.kakao.maps.LatLng(
         first.latitude,
@@ -42,16 +44,18 @@ export function ParkingLotMap({ parkingLots }: ParkingLotMapProps) {
 
       const map = new window.kakao.maps.Map(mapRef.current, {
         center,
-        level: 4,
+        level: 5,
       });
 
-      parkingLots.forEach((lot) => {
-        if (lot.latitude == null || lot.longitude == null) return;
+      const bounds = new window.kakao.maps.LatLngBounds();
 
+      validLots.forEach((lot) => {
         const position = new window.kakao.maps.LatLng(
           lot.latitude,
           lot.longitude
         );
+
+        bounds.extend(position);
 
         new window.kakao.maps.Marker({
           map,
@@ -59,6 +63,20 @@ export function ParkingLotMap({ parkingLots }: ParkingLotMapProps) {
           title: lot.name,
         });
       });
+
+      if (validLots.length > 1) {
+        map.setBounds(bounds);
+      }
+
+      setTimeout(() => {
+        map.relayout();
+
+        if (validLots.length > 1) {
+          map.setBounds(bounds);
+        } else {
+          map.setCenter(center);
+        }
+      }, 100);
     });
   }, [loaded, parkingLots]);
 
@@ -70,7 +88,10 @@ export function ParkingLotMap({ parkingLots }: ParkingLotMapProps) {
         onLoad={() => setLoaded(true)}
       />
 
-      <div className="h-[400px] w-full" ref={mapRef} />
+      <div
+        ref={mapRef}
+        className="kakao-map h-[420px] w-full overflow-hidden rounded-[20px]"
+      />
     </>
   );
 }
