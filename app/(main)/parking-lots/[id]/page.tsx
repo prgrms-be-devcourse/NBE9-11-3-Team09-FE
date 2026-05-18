@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/layout/header";
 import { parkingLotApi, type ParkingLot } from "@/lib/api";
+import { ParkingLotMap } from "@/components/parking/parking-lot-map";
 import {
   ArrowLeft,
   CalendarDays,
@@ -40,7 +41,6 @@ export default function ParkingLotDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [availableCount, setAvailableCount] = useState<number | null>(null);
-
 
   const fetchParkingLot = useCallback(async () => {
     if (!user?.accessToken) return;
@@ -165,6 +165,7 @@ export default function ParkingLotDetailPage() {
               {parkingLot.address}
             </div>
           </div>
+          
 
           {/* 예약하기 → /reserve 로 이동 */}
           <Link
@@ -262,6 +263,16 @@ export default function ParkingLotDetailPage() {
                 <p className="mb-1 text-[14px] font-semibold text-slate-500">도로명/지번 주소</p>
                 <p className="text-[18px] font-bold text-slate-900">{parkingLot.address}</p>
               </div>
+
+              {parkingLot.latitude != null && parkingLot.longitude != null ? (
+                  <div className="mt-5 overflow-hidden rounded-[16px] border border-slate-200 bg-white">
+                    <ParkingLotMap parkingLots={[parkingLot]} />
+                  </div>
+                ) : (
+                  <div className="mt-5 rounded-[16px] border border-slate-200 bg-white px-5 py-10 text-center text-[15px] font-semibold text-slate-500">
+                    지도 위치 정보가 없습니다.
+                  </div>
+                )}
             </div>
           </section>
         </section>

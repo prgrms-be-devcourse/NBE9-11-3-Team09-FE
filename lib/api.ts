@@ -12,6 +12,12 @@ export interface ApiResponse<T> {
   data: T;
 }
 
+export interface NearbyParkingLot extends ParkingLot {
+  latitude: number;
+  longitude: number;
+  distance: number;
+}
+
 // ─────────────────────────────────────────────
 // VehicleType
 // ─────────────────────────────────────────────
@@ -79,6 +85,8 @@ export interface ParkingLot {
   price: number;
   operationStartTime: string;
   operationEndTime: string;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export type SpotStatus = "AVAILABLE" | "OCCUPIED" | "PARKED" | "PAYING";
@@ -282,10 +290,23 @@ export const authApi = {
 // ─────────────────────────────────────────────
 // 주차장 API
 // ─────────────────────────────────────────────
+export interface PageResponse<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+}
 export const parkingLotApi = {
-  getList: (token: string, dong?: string) =>
-    apiRequest<ApiResponse<{ content: ParkingLot[], totalElements: number, totalPages: number, number: number }>>(
-      `/parking-lots${dong ? `?dong=${encodeURIComponent(dong)}` : ""}`,
+  getList: (token: string, keyword?: string) =>
+    apiRequest<ApiResponse<PageResponse<ParkingLot>>>(
+      `/parking-lots${keyword ? `?keyword=${encodeURIComponent(keyword)}` : ""}`,
+      { token }
+    ),
+
+  getNearby: (token: string, lat: number, lng: number, radius = 1000) =>
+    apiRequest<ApiResponse<NearbyParkingLot[]>>(
+      `/parking-lots/nearby?lat=${lat}&lng=${lng}&radius=${radius}`,
       { token }
     ),
 
