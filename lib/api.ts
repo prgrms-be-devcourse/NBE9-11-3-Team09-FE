@@ -298,9 +298,11 @@ export interface PageResponse<T> {
   number: number;
 }
 export const parkingLotApi = {
-  getList: (token: string, keyword?: string) =>
+  getList: (token: string, keyword?: string, page = 0, size = 6) =>
     apiRequest<ApiResponse<PageResponse<ParkingLot>>>(
-      `/parking-lots${keyword ? `?keyword=${encodeURIComponent(keyword)}` : ""}`,
+      `/parking-lots?page=${page}&size=${size}${
+      keyword ? `&keyword=${encodeURIComponent(keyword)}` : ""
+      }`,
       { token }
     ),
 
