@@ -32,19 +32,31 @@ export default function ParkingLotsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
   const [filters, setFilters] = useState<FilterOptions>({ sortBy: "name", hasAvailable: false });
 
   // ─── 목록 조회 ───────────────────────────────────────────
-  const fetchParkingLots = async (dong?: string) => {
+  const fetchParkingLots = async (dong?: string, page = 0) => {
     if (!user?.accessToken) return;
+
     setLoading(true);
     setError(null);
+    
     try {
-      const response = await parkingLotApi.getList(user.accessToken, dong);
+      const response = await parkingLotApi.getList(
+        user.accessToken, 
+        dong,
+        page,
+        ITEMS_PER_PAGE
+    );
       const lots = response.data.content ?? [];
 
       setParkingLots(lots);
       applySort(lots, filters);
+      setTotalPages(response.data.totalPages);
+      setTotalElements(response.data.totalElements);
+      setCurrentPage(response.data.number + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "주차장 목록을 불러오지 못했습니다.");
       setParkingLots([]);
@@ -139,13 +151,6 @@ export default function ParkingLotsPage() {
   };
 
   // ─── 페이지네이션 ────────────────────────────────────────
-  const totalPages = Math.max(1, Math.ceil(filteredLots.length / ITEMS_PER_PAGE));
-
-  const pagedLots = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredLots.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredLots, currentPage]);
-
   const visiblePages = useMemo(() => {
     const maxVisible = 5;
     const start = Math.max(1, currentPage - 2);
@@ -175,7 +180,7 @@ export default function ParkingLotsPage() {
                 <div className="rounded-full bg-white px-5 py-3 text-[15px] font-semibold text-slate-700">
                   전체{" "}
                   <span className="ml-1 text-[18px] text-[#2563eb]">
-                    {parkingLots.length}
+                    {totalElements}
                   </span>
                   개
                 </div>
@@ -230,7 +235,7 @@ export default function ParkingLotsPage() {
         <section className="mt-5 flex items-center justify-between">
           <p className="text-[18px] font-semibold text-slate-900">
             총{" "}
-            <span className="text-[#2563eb]">{filteredLots.length}</span>개의
+            <span className="text-[#2563eb]">{totalElements}</span>개의
             주차장
           </p>
           <div className="flex items-center gap-2">
@@ -276,16 +281,16 @@ export default function ParkingLotsPage() {
           <>
             {/* ── 카드 그리드 (cus03-04 ParkingLotCard) ── */}
             <section className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {pagedLots.map((lot) => (
-                <ParkingLotCard key={lot.id} parkingLot={lot} />
-              ))}
+            {filteredLots.map((lot) => (
+              <ParkingLotCard key={lot.id} parkingLot={lot} />
+            ))}
             </section>
 
             {/* ── 페이지네이션 (dev) ── */}
             <section className="mt-8 flex items-center justify-center gap-2">
               <button
                 type="button"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                onClick={() => fetchParkingLots(undefined, currentPage - 2)}
                 disabled={currentPage === 1}
                 className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white text-slate-500 disabled:opacity-50"
               >
@@ -296,7 +301,7 @@ export default function ParkingLotsPage() {
                 <button
                   key={page}
                   type="button"
-                  onClick={() => setCurrentPage(page)}
+                  onClick={() => fetchParkingLots(undefined, page - 1)}
                   className={`h-10 w-10 rounded-[10px] text-[18px] font-semibold ${
                     page === currentPage
                       ? "bg-[#2563eb] text-white"
@@ -309,7 +314,7 @@ export default function ParkingLotsPage() {
 
               <button
                 type="button"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() => fetchParkingLots(undefined, currentPage)}
                 disabled={currentPage === totalPages}
                 className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white text-slate-700 disabled:opacity-50"
               >
