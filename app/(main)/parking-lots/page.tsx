@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/header";
 import { ParkingLotCard } from "@/components/parking/parking-lot-card";
 import { SearchFilters, type FilterOptions } from "@/components/parking/search-filters";
 import { parkingLotApi, type ParkingLot } from "@/lib/api";
+import { ParkingLotMap } from "@/components/parking/parking-lot-map";
 import {
   ChevronLeft,
   ChevronRight,
@@ -13,7 +14,9 @@ import {
   AlertCircle,
   MapPin,
   RefreshCw,
+  LocateFixed,
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 
 // 한 페이지에 보여줄 카드 개수
@@ -38,7 +41,7 @@ export default function ParkingLotsPage() {
     setError(null);
     try {
       const response = await parkingLotApi.getList(user.accessToken, dong);
-      const lots = response.data;
+      const lots = response.data.content ?? [];
       setParkingLots(lots);
       applySort(lots, filters);
     } catch (err) {
@@ -49,6 +52,54 @@ export default function ParkingLotsPage() {
       setLoading(false);
     }
   };
+
+  const fetchNearbyParkingLots = () => {
+  if (!user?.accessToken) return;
+
+  if (!navigator.geolocation) {
+    setError("이 브라우저는 위치 조회를 지원하지 않습니다.");
+    return;
+  }
+
+  setLoading(true);
+  setError(null);
+
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      try {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+
+        const response = await parkingLotApi.getNearby(
+          user.accessToken,
+          lat,
+          lng,
+          1000
+        );
+
+        const lots = response.data ?? [];
+
+        setParkingLots(lots);
+        applySort(lots, filters);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "주변 주차장 조회에 실패했습니다."
+        );
+        setParkingLots([]);
+        setFilteredLots([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    () => {
+      setError("현재 위치 권한이 필요합니다.");
+      setLoading(false);
+    }
+  );
+};
+
 
   useEffect(() => {
     if (!authLoading && user?.accessToken) fetchParkingLots();
@@ -168,6 +219,11 @@ export default function ParkingLotsPage() {
         <section className="mt-5 rounded-[20px] bg-white px-5 py-6 shadow-[0_8px_24px_rgba(15,23,42,0.06)] md:px-7">
           <SearchFilters onSearch={handleSearch} onFilterChange={handleFilterChange} />
         </section>
+        {filteredLots.length > 0 && (
+            <section className="mt-5 overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+              <ParkingLotMap parkingLots={filteredLots} />
+            </section>
+          )}
 
         {/* ── 결과 수 + 새로고침 ── */}
         <section className="mt-5 flex items-center justify-between">
@@ -176,15 +232,27 @@ export default function ParkingLotsPage() {
             <span className="text-[#2563eb]">{filteredLots.length}</span>개의
             주차장
           </p>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => fetchParkingLots()}
-            disabled={loading}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            새로고침
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={fetchNearbyParkingLots}
+              disabled={loading}
+            >
+              <LocateFixed className="mr-2 h-4 w-4" />
+              내 주변 주차장 찾기
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => fetchParkingLots()}
+              disabled={loading}
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              새로고침
+            </Button>
+          </div>
         </section>
 
         {/* ── 상태별 렌더링 ── */}
