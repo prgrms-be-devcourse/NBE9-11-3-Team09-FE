@@ -34,11 +34,15 @@ export default function ParkingLotsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
-  const [filters, setFilters] = useState<FilterOptions>({ sortBy: "name", hasAvailable: false });
+  const [filters, setFilters] = useState<FilterOptions>({ sortBy: "name,asc", hasAvailable: false });
   const [keyword, setKeyword] = useState("");
 
   // ─── 목록 조회 ───────────────────────────────────────────
-  const fetchParkingLots = async (dong?: string, page = 0) => {
+  const fetchParkingLots = async (
+    keyword?: string, 
+    page = 0,
+    sortBy = filters.sortBy
+  ) => {
     if (!user?.accessToken) return;
 
     setLoading(true);
@@ -46,15 +50,16 @@ export default function ParkingLotsPage() {
     
     try {
       const response = await parkingLotApi.getList(
-        user.accessToken, 
-        dong,
+        user.accessToken,
+        keyword,
         page,
-        ITEMS_PER_PAGE
-    );
+        ITEMS_PER_PAGE,
+        sortBy
+      );
       const lots = response.data.content ?? [];
 
       setParkingLots(lots);
-      applySort(lots, filters);
+      setFilteredLots(lots);
       setTotalPages(response.data.totalPages);
       setTotalElements(response.data.totalElements);
       setCurrentPage(response.data.number + 1);
@@ -94,7 +99,7 @@ export default function ParkingLotsPage() {
         const lots = response.data ?? [];
 
         setParkingLots(lots);
-        applySort(lots, filters);
+        setFilteredLots(lots);
       } catch (err) {
         setError(
           err instanceof Error
@@ -120,16 +125,16 @@ export default function ParkingLotsPage() {
   }, [authLoading, user]);
 
   // ─── 정렬 적용 ───────────────────────────────────────────
-  const applySort = (lots: ParkingLot[], f: FilterOptions) => {
-    let sorted = [...lots];
-    if (f.sortBy === "price") {
-      sorted.sort((a, b) => a.price - b.price);
-    } else {
-      sorted.sort((a, b) => a.name.localeCompare(b.name, "ko"));
-    }
-    setFilteredLots(sorted);
-    setCurrentPage(1);
-  };
+  // const applySort = (lots: ParkingLot[], f: FilterOptions) => {
+  //   let sorted = [...lots];
+  //   if (f.sortBy === "price") {
+  //     sorted.sort((a, b) => a.price - b.price);
+  //   } else {
+  //     sorted.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  //   }
+  //   setFilteredLots(sorted);
+  //   setCurrentPage(1);
+  // };
 
   // ─── 검색 핸들러 (SearchFilters → 프론트 필터) ──────────
   const handleSearch = (query: string) => {
@@ -140,7 +145,7 @@ export default function ParkingLotsPage() {
   // ─── 필터 변경 ───────────────────────────────────────────
   const handleFilterChange = (newFilters: FilterOptions) => {
     setFilters(newFilters);
-    applySort(filteredLots, newFilters);
+    fetchParkingLots(keyword, 0, newFilters.sortBy);
   };
 
   // ─── 페이지네이션 ────────────────────────────────────────

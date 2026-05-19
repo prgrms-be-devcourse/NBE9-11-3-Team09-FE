@@ -12,7 +12,7 @@ interface SearchFiltersProps {
 }
 
 export interface FilterOptions {
-  sortBy: "name" | "price" | "availability";
+  sortBy: "name,asc" | "totalSpot,desc";
   hasAvailable: boolean;
 }
 
@@ -26,7 +26,7 @@ export function SearchFilters({ onSearch, onFilterChange }: SearchFiltersProps) 
   const [showFilters, setShowFilters] = useState(false);
   const [selectedDong, setSelectedDong] = useState("전체");
   const [filters, setFilters] = useState<FilterOptions>({
-    sortBy: "name",
+    sortBy: "name,asc",
     hasAvailable: false,
   });
 
@@ -142,9 +142,8 @@ export function SearchFilters({ onSearch, onFilterChange }: SearchFiltersProps) 
             <h4 className="text-sm font-medium mb-2">정렬</h4>
             <div className="flex gap-2">
               {[
-                { value: "name", label: "이름순" },
-                { value: "price", label: "가격순" },
-                { value: "availability", label: "여유순" },
+                { value: "name,asc", label: "기본순" },
+                { value: "totalSpot,desc", label: "주차면 많은 순" },
               ].map((option) => (
                 <button
                   key={option.value}
