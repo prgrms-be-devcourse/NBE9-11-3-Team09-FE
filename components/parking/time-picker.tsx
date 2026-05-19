@@ -26,13 +26,36 @@ export function TimePicker({
     return date;
   });
 
+  // +2일, +3일은 아직 오픈되지 않은 날짜 - disabled 처리
+  const isDisabledDate = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(date);
+    target.setHours(0, 0, 0, 0);
+    const diff = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return diff === 2 || diff === 3;
+  };
+
   const [selectedDate, setSelectedDate] = useState<Date>(dates[0]);
   const [startHour, setStartHour] = useState<number>(0);
   const [duration, setDuration] = useState<number>(1);
 
   const DURATION_OPTIONS = [1, 2, 3, 4, 5, 6, 8, 12];
 
-  const hours = Array.from({ length: 24 }, (_, i) => i);
+  // 0~21시만 허용 (종료 시간이 최대 22시)
+  const hours = Array.from({ length: 22 }, (_, i) => i);
+
+  // startHour 기준으로 종료 시간이 22시 이하인 duration만 허용
+  const availableDurations = DURATION_OPTIONS.filter(
+    (d) => startHour + d <= 22
+  );
+
+  // startHour 변경 시 duration이 범위 벗어나면 초기화
+  useEffect(() => {
+    if (startHour + duration > 22) {
+      setDuration(availableDurations[0] ?? 1);
+    }
+  }, [startHour]);
 
   const formatDate = (date: Date) => {
     const days = ["일", "월", "화", "수", "목", "금", "토"];
@@ -60,21 +83,30 @@ export function TimePicker({
           <Calendar className="w-4 h-4" /> 날짜 선택
         </label>
         <div className="flex gap-2 overflow-x-auto pb-2">
-          {dates.map((date) => (
-            <button
-              key={date.toISOString()}
-              onClick={() => setSelectedDate(date)}
-              className={cn(
-                "px-4 py-3 rounded-xl text-sm font-medium transition-all min-w-[80px]",
-                selectedDate.toDateString() === date.toDateString()
-                  ? "bg-foreground text-background"
-                  : "bg-muted text-muted-foreground"
-              )}
-            >
-              {formatDate(date)}
-            </button>
-          ))}
+          {dates.map((date) => {
+            const disabled = isDisabledDate(date);
+            return (
+              <button
+                key={date.toISOString()}
+                onClick={() => !disabled && setSelectedDate(date)}
+                disabled={disabled}
+                className={cn(
+                  "px-4 py-3 rounded-xl text-sm font-medium transition-all min-w-[80px]",
+                  disabled
+                    ? "bg-muted text-muted-foreground opacity-40 cursor-not-allowed"
+                    : selectedDate.toDateString() === date.toDateString()
+                    ? "bg-foreground text-background"
+                    : "bg-muted text-muted-foreground"
+                )}
+              >
+                {formatDate(date)}
+              </button>
+            );
+          })}
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          ※ 비활성화된 날짜는 전날 22시에 오픈됩니다.
+        </p>
       </div>
 
       {/* 시작 시간 선택 */}
@@ -101,7 +133,7 @@ export function TimePicker({
       <div>
         <label className="text-sm font-medium mb-3 block">이용 시간</label>
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-          {DURATION_OPTIONS.map((d) => (
+          {availableDurations.map((d) => (
             <button
               key={d}
               onClick={() => setDuration(d)}
