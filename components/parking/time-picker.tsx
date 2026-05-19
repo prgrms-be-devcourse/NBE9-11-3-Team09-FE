@@ -43,7 +43,20 @@ export function TimePicker({
 
   const DURATION_OPTIONS = [1, 2, 3, 4, 5, 6, 8, 12];
 
-  const hours = Array.from({ length: 24 }, (_, i) => i);
+  // 0~21시만 허용 (종료 시간이 최대 22시)
+  const hours = Array.from({ length: 22 }, (_, i) => i);
+
+  // startHour 기준으로 종료 시간이 22시 이하인 duration만 허용
+  const availableDurations = DURATION_OPTIONS.filter(
+    (d) => startHour + d <= 22
+  );
+
+  // startHour 변경 시 duration이 범위 벗어나면 초기화
+  useEffect(() => {
+    if (startHour + duration > 22) {
+      setDuration(availableDurations[0] ?? 1);
+    }
+  }, [startHour]);
 
   const formatDate = (date: Date) => {
     const days = ["일", "월", "화", "수", "목", "금", "토"];
@@ -121,7 +134,7 @@ export function TimePicker({
       <div>
         <label className="text-sm font-medium mb-3 block">이용 시간</label>
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-          {DURATION_OPTIONS.map((d) => (
+          {availableDurations.map((d) => (
             <button
               key={d}
               onClick={() => setDuration(d)}
