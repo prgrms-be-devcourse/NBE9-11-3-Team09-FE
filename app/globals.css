@@ -46,3 +46,7 @@
     @apply bg-background text-foreground;
   }
 }
+
+.kakao-map img {
+  max-width: none !important;
+}
