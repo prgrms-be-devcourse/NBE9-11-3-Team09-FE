@@ -37,9 +37,13 @@ export default function AdminParkingSpotsPage() {
   const [loadingLots, setLoadingLots] = useState(true);
   const [loadingSpots, setLoadingSpots] = useState(false);
 
-  // 페이지네이션
+  // 자리 페이지네이션
   const SPOTS_PER_PAGE = 10;
   const [currentPage, setCurrentPage] = useState(1);
+
+  // 주차장 목록 페이지네이션
+  const LOTS_PER_PAGE = 10;
+  const [lotsPage, setLotsPage] = useState(1);
 
   // 상태 변경 중인 자리 id → 선택된 status 값
   const [pendingStatus, setPendingStatus] = useState<Record<number, SpotStatus>>({});
@@ -48,13 +52,16 @@ export default function AdminParkingSpotsPage() {
   // 성공 피드백
   const [successId, setSuccessId] = useState<number | null>(null);
 
+  const totalLotsPages = Math.ceil(lots.length / LOTS_PER_PAGE);
+  const pagedLots = lots.slice((lotsPage - 1) * LOTS_PER_PAGE, lotsPage * LOTS_PER_PAGE);
+
   // 주차장 목록 불러오기
   useEffect(() => {
     if (!user?.accessToken) return;
     setLoadingLots(true);
     parkingLotApi
-      .getList(user.accessToken)
-      .then((res) => setLots(res.data ?? []))
+      .getList(user.accessToken, undefined, 0, 1000)
+      .then((res) => setLots(res.data?.content ?? []))
       .catch(() => setLots([]))
       .finally(() => setLoadingLots(false));
   }, [user]);
@@ -122,31 +129,54 @@ export default function AdminParkingSpotsPage() {
             ) : lots.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-10">주차장이 없습니다.</p>
             ) : (
-              <ul className="divide-y divide-slate-100">
-                {lots.map((lot) => (
-                  <li key={lot.id}>
-                    <button
-                      onClick={() => handleSelectLot(lot)}
-                      className={cn(
-                        "w-full text-left px-4 py-3 text-sm transition-colors",
-                        selectedLot?.id === lot.id
-                          ? "bg-[#2563eb] text-white font-semibold"
-                          : "text-slate-700 hover:bg-slate-50"
-                      )}
-                    >
-                      <p className="font-medium">{lot.name}</p>
-                      <p
+              <>
+                <ul className="divide-y divide-slate-100">
+                  {pagedLots.map((lot) => (
+                    <li key={lot.id}>
+                      <button
+                        onClick={() => handleSelectLot(lot)}
                         className={cn(
-                          "text-xs mt-0.5",
-                          selectedLot?.id === lot.id ? "text-blue-100" : "text-slate-400"
+                          "w-full text-left px-4 py-3 text-sm transition-colors",
+                          selectedLot?.id === lot.id
+                            ? "bg-[#2563eb] text-white font-semibold"
+                            : "text-slate-700 hover:bg-slate-50"
                         )}
                       >
-                        {lot.address}
-                      </p>
+                        <p className="font-medium">{lot.name}</p>
+                        <p
+                          className={cn(
+                            "text-xs mt-0.5",
+                            selectedLot?.id === lot.id ? "text-blue-100" : "text-slate-400"
+                          )}
+                        >
+                          {lot.address}
+                        </p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {totalLotsPages > 1 && (
+                  <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100">
+                    <button
+                      onClick={() => setLotsPage((p) => Math.max(1, p - 1))}
+                      disabled={lotsPage === 1}
+                      className="h-7 w-7 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 disabled:opacity-40 hover:bg-slate-200 transition-colors"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
                     </button>
-                  </li>
-                ))}
-              </ul>
+                    <span className="text-xs text-slate-500">
+                      {lotsPage} / {totalLotsPages}
+                    </span>
+                    <button
+                      onClick={() => setLotsPage((p) => Math.min(totalLotsPages, p + 1))}
+                      disabled={lotsPage === totalLotsPages}
+                      className="h-7 w-7 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 disabled:opacity-40 hover:bg-slate-200 transition-colors"
+                    >
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

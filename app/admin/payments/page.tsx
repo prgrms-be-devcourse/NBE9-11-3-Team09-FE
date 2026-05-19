@@ -18,7 +18,7 @@ export default function AdminPaymentsPage() {
     setLoading(true);
     try {
       const res = await adminPaymentApi.getAll(user.accessToken);
-      setPayments(res.data ?? []);
+      setPayments(res.data?.content ?? []);
     } catch {
       setPayments([]);
     } finally {
