@@ -375,8 +375,9 @@ export const adminUserApi = {
 };
 
 export const adminPaymentApi = {
-  getAll: (token: string) =>
-    apiRequest<ApiResponse<AdminPayment[]>>(`/admin/payments`, { token }),
+// adminPaymentApi
+  getAll: (token: string, page = 0, size = 10) =>
+    apiRequest<ApiResponse<PageResponse<AdminPayment>>>(`/admin/payments?page=${page}&size=${size}`, { token }),
 
   getByUser: (token: string, userId: number) =>
     apiRequest<ApiResponse<AdminPayment[]>>(`/admin/payments/${userId}`, { token }),

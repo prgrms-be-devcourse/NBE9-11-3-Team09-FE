@@ -19,7 +19,7 @@ export default function AdminDashboardPage() {
           adminReservationApi.getList(user.accessToken),
           adminPaymentApi.getAll(user.accessToken),
         ]);
-        const payments = paymentsRes.data ?? [];
+        const payments = paymentsRes.data?.content ?? [];
         const revenue = payments
           .filter((p: any) => p.status === "COMPLETE")
           .reduce((sum: number, p: any) => sum + p.amount, 0);
@@ -27,7 +27,7 @@ export default function AdminDashboardPage() {
         setStats({
           users: usersRes.data?.totalElements ?? 0,
           reservations: reservationsRes.data?.totalElements ?? 0,
-          payments: payments.length,
+          payments: paymentsRes.data?.totalElements ?? 0,  // ← content.length 아니라 totalElements
           revenue,
         });
       } catch {
