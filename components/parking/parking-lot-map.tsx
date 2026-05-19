@@ -1,6 +1,7 @@
 "use client";
 
 import Script from "next/script";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 declare global {
@@ -22,6 +23,7 @@ type ParkingLotMapProps = {
 };
 
 export function ParkingLotMap({ parkingLots }: ParkingLotMapProps) {
+  const router = useRouter();
   const mapRef = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -29,13 +31,11 @@ export function ParkingLotMap({ parkingLots }: ParkingLotMapProps) {
     if (!loaded || !mapRef.current || !window.kakao) return;
 
     window.kakao.maps.load(() => {
-      const validLots = parkingLots.filter(
+      const first = parkingLots.find(
         (lot) => lot.latitude != null && lot.longitude != null
       );
 
-      if (validLots.length === 0) return;
-
-      const first = validLots[0];
+      if (!first) return;
 
       const center = new window.kakao.maps.LatLng(
         first.latitude,
@@ -44,41 +44,29 @@ export function ParkingLotMap({ parkingLots }: ParkingLotMapProps) {
 
       const map = new window.kakao.maps.Map(mapRef.current, {
         center,
-        level: 5,
+        level: 4,
       });
 
-      const bounds = new window.kakao.maps.LatLngBounds();
+      parkingLots.forEach((lot) => {
+        if (lot.latitude == null || lot.longitude == null) return;
 
-      validLots.forEach((lot) => {
         const position = new window.kakao.maps.LatLng(
           lot.latitude,
           lot.longitude
         );
 
-        bounds.extend(position);
-
-        new window.kakao.maps.Marker({
+        const marker = new window.kakao.maps.Marker({
           map,
           position,
           title: lot.name,
         });
+
+        window.kakao.maps.event.addListener(marker, "click", () => {
+          router.push(`/parking-lots/${lot.id}`);
+        });
       });
-
-      if (validLots.length > 1) {
-        map.setBounds(bounds);
-      }
-
-      setTimeout(() => {
-        map.relayout();
-
-        if (validLots.length > 1) {
-          map.setBounds(bounds);
-        } else {
-          map.setCenter(center);
-        }
-      }, 100);
     });
-  }, [loaded, parkingLots]);
+  }, [loaded, parkingLots, router]);
 
   return (
     <>
@@ -88,10 +76,7 @@ export function ParkingLotMap({ parkingLots }: ParkingLotMapProps) {
         onLoad={() => setLoaded(true)}
       />
 
-      <div
-        ref={mapRef}
-        className="kakao-map h-[420px] w-full overflow-hidden rounded-[20px]"
-      />
+      <div className="h-[400px] w-full" ref={mapRef} />
     </>
   );
 }

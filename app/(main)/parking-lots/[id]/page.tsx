@@ -1,330 +1,284 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/layout/header";
-import { ParkingLotCard } from "@/components/parking/parking-lot-card";
-import { SearchFilters, type FilterOptions } from "@/components/parking/search-filters";
 import { parkingLotApi, type ParkingLot } from "@/lib/api";
 import { ParkingLotMap } from "@/components/parking/parking-lot-map";
 import {
-  ChevronLeft,
-  ChevronRight,
+  ArrowLeft,
+  CalendarDays,
+  Car,
+  Clock3,
   Loader2,
   AlertCircle,
   MapPin,
-  RefreshCw,
-  LocateFixed,
+  Wallet,
 } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 
-// 한 페이지에 보여줄 카드 개수
-const ITEMS_PER_PAGE = 6;
+function formatTime(value?: string) {
+  if (!value) return "-";
+  return value.slice(0, 5);
+}
+function formatPrice(value?: number) {
+  if (value === undefined || value === null) return "-";
+  return `${value.toLocaleString()}원`;
+}
 
-export default function ParkingLotsPage() {
+export default function ParkingLotDetailPage() {
+  // ----------------------------
+  // 5. URL 파라미터에서 주차장 id 추출
+  // ----------------------------
+  // 예: /parking-lots/3 → id = "3"
+  const params = useParams();
   const { user, isLoading: authLoading } = useAuth();
+  const parkingLotId = Number(params?.id);
 
-  const [parkingLots, setParkingLots] = useState<ParkingLot[]>([]);
-  const [filteredLots, setFilteredLots] = useState<ParkingLot[]>([]);
-
-  // API 호출 상태
+  const [parkingLot, setParkingLot] = useState<ParkingLot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalElements, setTotalElements] = useState(0);
-  const [filters, setFilters] = useState<FilterOptions>({ sortBy: "name", hasAvailable: false });
+  const [availableCount, setAvailableCount] = useState<number | null>(null);
 
-  // ─── 목록 조회 ───────────────────────────────────────────
-  const fetchParkingLots = async (dong?: string, page = 0) => {
+  const fetchParkingLot = useCallback(async () => {
     if (!user?.accessToken) return;
-
     setLoading(true);
     setError(null);
-    
     try {
-      const response = await parkingLotApi.getList(
-        user.accessToken, 
-        dong,
-        page,
-        ITEMS_PER_PAGE
-    );
-      const lots = response.data.content ?? [];
-
-      setParkingLots(lots);
-      applySort(lots, filters);
-      setTotalPages(response.data.totalPages);
-      setTotalElements(response.data.totalElements);
-      setCurrentPage(response.data.number + 1);
+      const res = await parkingLotApi.getDetail(user.accessToken, parkingLotId);
+      setParkingLot(res.data);
+      // 이용가능 자리 수 조회
+      const spotsRes = await parkingLotApi.getAvailableSpots(user.accessToken, parkingLotId);
+      setAvailableCount(spotsRes.data.length);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "주차장 목록을 불러오지 못했습니다.");
-      setParkingLots([]);
-      setFilteredLots([]);
+      setError(
+        err instanceof Error ? err.message : "주차장 상세 정보를 불러오지 못했습니다."
+      );
     } finally {
       setLoading(false);
     }
-  };
-
-  const fetchNearbyParkingLots = () => {
-  if (!user?.accessToken) return;
-
-  if (!navigator.geolocation) {
-    setError("이 브라우저는 위치 조회를 지원하지 않습니다.");
-    return;
-  }
-
-  setLoading(true);
-  setError(null);
-
-  navigator.geolocation.getCurrentPosition(
-    async (position) => {
-      try {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-
-        const response = await parkingLotApi.getNearby(
-          user.accessToken,
-          lat,
-          lng,
-          1000
-        );
-
-        const lots = response.data ?? [];
-
-        setParkingLots(lots);
-        applySort(lots, filters);
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "주변 주차장 조회에 실패했습니다."
-        );
-        setParkingLots([]);
-        setFilteredLots([]);
-      } finally {
-        setLoading(false);
-      }
-    },
-    () => {
-      setError("현재 위치 권한이 필요합니다.");
-      setLoading(false);
-    }
-  );
-};
-
+  }, [parkingLotId, user]);
 
   useEffect(() => {
-    if (!authLoading && user?.accessToken) fetchParkingLots();
-  }, [authLoading, user]);
+    if (!authLoading && user?.accessToken) fetchParkingLot();
+  }, [fetchParkingLot, authLoading, user]);
 
-  // ─── 정렬 적용 ───────────────────────────────────────────
-  const applySort = (lots: ParkingLot[], f: FilterOptions) => {
-    let sorted = [...lots];
-    if (f.sortBy === "price") {
-      sorted.sort((a, b) => a.price - b.price);
-    } else {
-      sorted.sort((a, b) => a.name.localeCompare(b.name, "ko"));
-    }
-    setFilteredLots(sorted);
-    setCurrentPage(1);
-  };
-
-  // ─── 검색 핸들러 (SearchFilters → 프론트 필터) ──────────
-  const handleSearch = (query: string) => {
-    if (!query) {
-      applySort(parkingLots, filters);
-      return;
-    }
-    const matched = parkingLots.filter(
-      (l) =>
-        l.name.toLowerCase().includes(query.toLowerCase()) ||
-        l.address.toLowerCase().includes(query.toLowerCase())
+  // ── 로딩 ──
+  if (loading || authLoading) {
+    return (
+      <div className="min-h-screen bg-[#f3f6fb]">
+        <Header />
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-[#2563eb]" />
+        </div>
+      </div>
     );
-    applySort(matched, filters);
-  };
+  }
 
-  // ─── 필터 변경 ───────────────────────────────────────────
-  const handleFilterChange = (newFilters: FilterOptions) => {
-    setFilters(newFilters);
-    applySort(filteredLots, newFilters);
-  };
+  // ── 에러 / 데이터 없음 ──
+  if (error || !parkingLot) {
+    return (
+      <div className="min-h-screen bg-[#f3f6fb]">
+        <Header />
+        <div className="mx-auto flex max-w-3xl flex-col items-center px-4 py-20">
+          <AlertCircle className="mb-4 h-12 w-12 text-red-500" />
+          <p className="mb-4 font-medium text-red-500">
+            {error ?? "주차장 정보를 불러올 수 없습니다."}
+          </p>
+          <Link href="/parking-lots">
+            <Button>목록으로 돌아가기</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
-  // ─── 페이지네이션 ────────────────────────────────────────
-  const visiblePages = useMemo(() => {
-    const maxVisible = 5;
-    const start = Math.max(1, currentPage - 2);
-    const end = Math.min(totalPages, start + maxVisible - 1);
-    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
-  }, [currentPage, totalPages]);
+  const summaryCards = [
+    {
+      icon: <Clock3 className="h-5 w-5 text-[#2563eb]" />,
+      label: "운영 시간",
+      value: `${formatTime(parkingLot.operationStartTime)} ~ ${formatTime(parkingLot.operationEndTime)}`,
+      sub: "운영시간 기준 정보",
+    },
+    {
+      icon: <Wallet className="h-5 w-5 text-[#2563eb]" />,
+      label: "요금",
+      value: formatPrice(parkingLot.price),
+      sub: "10분당 요금",
+    },
+    {
+      icon: <Car className="h-5 w-5 text-[#2563eb]" />,
+      label: "총 주차면수",
+      value: `${parkingLot.totalSpot.toLocaleString()}면`,
+      sub: "전체 주차 가능 구획 수",
+    },
+  ];
 
-  // ─── 렌더링 ──────────────────────────────────────────────
+  const tableRows = [
+    { label: "주차장명", value: parkingLot.name },
+    { label: "주소", value: parkingLot.address },
+    {
+      label: "운영시간",
+      value: `${formatTime(parkingLot.operationStartTime)} ~ ${formatTime(parkingLot.operationEndTime)}`,
+    },
+    { label: "요금", value: formatPrice(parkingLot.price) },
+    { label: "주차면수", value: `총 ${parkingLot.totalSpot.toLocaleString()}면` },
+  ];
+
   return (
     <div className="min-h-screen bg-[#f3f6fb] text-slate-900">
       <Header />
 
       <main className="mx-auto max-w-[1280px] px-4 pb-14 md:px-6">
 
-        {/* ── 히어로 배너 (dev) ── */}
-        <section className="overflow-hidden bg-[#eaf1ff]">
-          <div className="flex min-h-[220px] items-center justify-between px-6 py-10 md:px-10">
-            <div>
-              <h1 className="mb-3 text-[38px] font-extrabold leading-none tracking-[-0.03em] md:text-[56px]">
-                <span className="text-[#2563eb]">강남구</span>{" "}
-                <span className="text-slate-900">공영주차장</span>
+        {/* 뒤로가기 */}
+        <section className="py-6">
+          <Link
+            href="/parking-lots"
+            className="inline-flex items-center gap-2 text-[16px] font-medium text-[#2563eb]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            목록으로 돌아가기
+          </Link>
+        </section>
+
+        {/* 상단: 이름 + 배지 + 주소 + 예약 버튼 */}
+        <section className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <h1 className="text-[34px] font-extrabold tracking-[-0.03em] md:text-[48px]">
+                {parkingLot.name}
               </h1>
-              <p className="mb-6 text-[16px] font-medium text-slate-600 md:text-[18px]">
-                강남구 내 공영주차장을 검색하고 정보를 확인하세요.
-              </p>
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="rounded-full bg-white px-5 py-3 text-[15px] font-semibold text-slate-700">
-                  전체{" "}
-                  <span className="ml-1 text-[18px] text-[#2563eb]">
-                    {totalElements}
-                  </span>
-                  개
-                </div>
-                <div className="flex items-center gap-2 rounded-full bg-white px-5 py-3 text-[15px] font-semibold text-slate-700">
-                  <MapPin className="h-4 w-4 text-[#2563eb]" />
-                  조회 기준: <span className="text-[#2563eb]">강남구</span>
-                </div>
-              </div>
+              <span className="rounded-full bg-[#eef4ff] px-4 py-1.5 text-[16px] font-bold text-[#2563eb]">
+                공영주차장
+              </span>
+              {availableCount !== null && (
+                <span className="text-[14px] font-semibold text-slate-500">
+                  🟢 이용가능한 자리 : {availableCount}
+                </span>
+              )}
             </div>
-
-            {/* 데코 일러스트 */}
-            <div className="hidden lg:block">
-              <div className="flex items-end gap-10">
-                {/* 자동차 */}
-                <div className="relative h-[90px] w-[160px]">
-                  <div className="absolute bottom-0 left-[20px] h-[24px] w-[20px] rounded-md bg-slate-800" />
-                  <div className="absolute bottom-0 right-[20px] h-[24px] w-[20px] rounded-md bg-slate-800" />
-                  <div className="absolute bottom-[45px] left-[30px] h-[35px] w-[100px] rounded-t-2xl bg-[#2563eb]" />
-                  <div className="absolute bottom-[45px] left-[38px] h-[25px] w-[84px] rounded-t-xl bg-slate-200" />
-                  <div className="absolute bottom-[40px] left-[18px] h-[12px] w-[12px] rounded-l-md bg-[#2563eb]" />
-                  <div className="absolute bottom-[40px] right-[18px] h-[12px] w-[12px] rounded-r-md bg-[#2563eb]" />
-                  <div className="absolute bottom-[10px] left-0 h-[45px] w-[160px] rounded-xl bg-[#2563eb] shadow-md" />
-                  <div className="absolute bottom-[25px] left-[50px] h-[14px] w-[60px] rounded-sm bg-slate-800" />
-                  <div className="absolute bottom-[30px] left-[16px] h-[14px] w-[14px] rounded-full bg-[#FFFBFA]" />
-                  <div className="absolute bottom-[30px] right-[16px] h-[14px] w-[14px] rounded-full bg-[#FFFBFA]" />
-                  <div className="absolute bottom-[14px] left-[65px] h-[8px] w-[30px] rounded-sm bg-white" />
-                </div>
-
-                {/* P 표지판 */}
-                <div className="flex flex-col items-center">
-                  <div className="flex h-[54px] w-[54px] items-center justify-center rounded-[12px] bg-[#2563eb] text-white shadow">
-                    <span className="text-[32px] font-bold">P</span>
-                  </div>
-                  <div className="h-[100px] w-[14px] rounded bg-[#2563eb]" />
-                </div>
-              </div>
+            <div className="flex items-center gap-2 text-[18px] text-slate-600 md:text-[20px]">
+              <MapPin className="h-5 w-5 shrink-0 text-[#2563eb]" />
+              {parkingLot.address}
             </div>
           </div>
+          
+
+          {/* 예약하기 → /reserve 로 이동 */}
+          <Link
+            href={`/parking-lots/${parkingLotId}/reserve`}
+            className="flex h-[56px] w-full items-center justify-center rounded-[12px] bg-[#2563eb] px-8 text-[18px] font-bold text-white hover:bg-[#1d4ed8] lg:w-[220px]"
+          >
+            <CalendarDays className="mr-3 h-5 w-5" />
+            예약하기
+          </Link>
         </section>
 
-        {/* ── 검색/필터 (cus03-04 SearchFilters) ── */}
-        <section className="mt-5 rounded-[20px] bg-white px-5 py-6 shadow-[0_8px_24px_rgba(15,23,42,0.06)] md:px-7">
-          <SearchFilters onSearch={handleSearch} onFilterChange={handleFilterChange} />
-        </section>
-       {filteredLots.length > 0 && (
-          <section className="mt-5 overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-            <ParkingLotMap parkingLots={filteredLots} />
-          </section>
-        )}
-        {/* ── 결과 수 + 새로고침 ── */}
-        <section className="mt-5 flex items-center justify-between">
-          <p className="text-[18px] font-semibold text-slate-900">
-            총{" "}
-            <span className="text-[#2563eb]">{totalElements}</span>개의
-            주차장
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={fetchNearbyParkingLots}
-              disabled={loading}
-            >
-              <LocateFixed className="mr-2 h-4 w-4" />
-              내 주변 주차장 찾기
-            </Button>
+        {/* 정보 카드 영역 */}
+        <section className="rounded-[24px] bg-white px-5 py-6 shadow-[0_8px_24px_rgba(15,23,42,0.06)] md:px-8 md:py-8">
 
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => fetchParkingLots()}
-              disabled={loading}
-            >
-              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-              새로고침
-            </Button>
-          </div>
-        </section>
-
-        {/* ── 상태별 렌더링 ── */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="mb-4 h-8 w-8 animate-spin text-[#2563eb]" />
-            <p className="text-slate-500">주차장을 불러오는 중...</p>
-          </div>
-        ) : error ? (
-          <div className="mt-6 flex flex-col items-center justify-center rounded-[20px] bg-white py-16 shadow-sm">
-            <AlertCircle className="mb-4 h-12 w-12 text-red-500" />
-            <p className="mb-4 font-medium text-red-500">{error}</p>
-            <Button onClick={() => fetchParkingLots()}>다시 시도</Button>
-          </div>
-        ) : filteredLots.length === 0 ? (
-          <div className="mt-6 rounded-[20px] bg-white px-6 py-10 text-center text-slate-500 shadow-sm">
-            검색 결과가 없습니다.
-          </div>
-        ) : (
-          <>
-            {/* ── 카드 그리드 (cus03-04 ParkingLotCard) ── */}
-            <section className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredLots.map((lot) => (
-              <ParkingLotCard key={lot.id} parkingLot={lot} />
-            ))}
-            </section>
-
-            {/* ── 페이지네이션 (dev) ── */}
-            <section className="mt-8 flex items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => fetchParkingLots(undefined, currentPage - 2)}
-                disabled={currentPage === 1}
-                className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white text-slate-500 disabled:opacity-50"
+          {/* 요약 카드 3개 */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {summaryCards.map(({ icon, label, value, sub }) => (
+              <div
+                key={label}
+                className="rounded-[18px] border border-[#e4eefc] bg-[#f8fbff] px-6 py-5"
               >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#eaf1ff]">
+                    {icon}
+                  </div>
+                  <span className="text-[16px] font-bold text-slate-700">{label}</span>
+                </div>
+                <p className="text-[26px] font-extrabold text-slate-900">{value}</p>
+                <p className="mt-2 text-[14px] font-medium text-slate-500">{sub}</p>
+              </div>
+            ))}
+          </div>
 
-              {visiblePages.map((page) => (
-                <button
-                  key={page}
-                  type="button"
-                  onClick={() => fetchParkingLots(undefined, page - 1)}
-                  className={`h-10 w-10 rounded-[10px] text-[18px] font-semibold ${
-                    page === currentPage
-                      ? "bg-[#2563eb] text-white"
-                      : "bg-transparent text-slate-800"
+          {/* 기본 정보 테이블 */}
+          <section className="mt-8">
+            <h2 className="mb-4 text-[22px] font-extrabold tracking-[-0.02em] text-slate-900">
+              기본 정보
+            </h2>
+            <div className="overflow-hidden rounded-[12px] border border-slate-200">
+              {tableRows.map(({ label, value }, idx) => (
+                <div
+                  key={label}
+                  className={`grid grid-cols-[140px_1fr] md:grid-cols-[180px_1fr] ${
+                    idx < tableRows.length - 1 ? "border-b border-slate-200" : ""
                   }`}
                 >
-                  {page}
-                </button>
+                  <div className="bg-slate-50 px-4 py-4 text-[15px] font-bold text-slate-600 md:px-5">
+                    {label}
+                  </div>
+                  <div className="px-4 py-4 text-[15px] font-semibold text-slate-800 md:px-5">
+                    {value}
+                  </div>
+                </div>
               ))}
+            </div>
+          </section>
 
-              <button
-                type="button"
-                onClick={() => fetchParkingLots(undefined, currentPage)}
-                disabled={currentPage === totalPages}
-                className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white text-slate-700 disabled:opacity-50"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </button>
-            </section>
-          </>
-        )}
+          {/* 이용 안내 */}
+          <section className="mt-8">
+            <h2 className="mb-4 text-[22px] font-extrabold tracking-[-0.02em] text-slate-900">
+              이용 안내
+            </h2>
+            <div className="rounded-[16px] bg-slate-50 px-5 py-5">
+              <ul className="space-y-2 text-[15px] font-medium text-slate-600 md:text-[16px]">
+                <li>
+                  • 운영시간은 {formatTime(parkingLot.operationStartTime)} ~{" "}
+                  {formatTime(parkingLot.operationEndTime)} 입니다.
+                </li>
+                <li>• 기본 요금은 {formatPrice(parkingLot.price)} (10분당) 입니다.</li>
+                <li>
+                  • 총 주차 가능 면수는 {parkingLot.totalSpot.toLocaleString()}면입니다.
+                </li>
+                <li>• 본인의 차량 종류와 일치하는 구역만 예약 가능합니다.</li>
+                <li>• 방문 전 최신 운영 여부와 현장 상황을 다시 확인해주세요.</li>
+              </ul>
+            </div>
+          </section>
+
+          {/* 위치 */}
+          <section className="mt-8">
+            <h2 className="mb-4 text-[22px] font-extrabold tracking-[-0.02em] text-slate-900">
+              위치
+            </h2>
+            <div className="rounded-[18px] border border-slate-200 bg-[#f8fbff] p-6">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-[12px] bg-[#2563eb] text-white">
+                  <MapPin className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-[18px] font-bold text-slate-900">{parkingLot.name}</p>
+                  <p className="text-[14px] text-slate-500">주소 정보</p>
+                </div>
+              </div>
+              <div className="rounded-[14px] border border-slate-200 bg-white px-5 py-4">
+                <p className="mb-1 text-[14px] font-semibold text-slate-500">도로명/지번 주소</p>
+                <p className="text-[18px] font-bold text-slate-900">{parkingLot.address}</p>
+              </div>
+
+              {parkingLot.latitude != null && parkingLot.longitude != null ? (
+                  <div className="mt-5 overflow-hidden rounded-[16px] border border-slate-200 bg-white">
+                    <ParkingLotMap parkingLots={[parkingLot]} />
+                  </div>
+                ) : (
+                  <div className="mt-5 rounded-[16px] border border-slate-200 bg-white px-5 py-10 text-center text-[15px] font-semibold text-slate-500">
+                    지도 위치 정보가 없습니다.
+                  </div>
+                )}
+            </div>
+          </section>
+        </section>
       </main>
 
-      {/* ── 푸터 (dev) ── */}
+      {/* 푸터 */}
       <footer className="mt-10 border-t border-slate-200 bg-[#f3f6fb]">
         <div className="mx-auto flex max-w-[1280px] flex-col gap-4 px-6 py-8 md:flex-row md:items-end md:justify-between">
           <div>
