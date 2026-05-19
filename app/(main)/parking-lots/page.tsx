@@ -34,10 +34,15 @@ export default function ParkingLotsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
-  const [filters, setFilters] = useState<FilterOptions>({ sortBy: "name", hasAvailable: false });
+  const [filters, setFilters] = useState<FilterOptions>({ sortBy: "name,asc", hasAvailable: false });
+  const [keyword, setKeyword] = useState("");
 
   // ─── 목록 조회 ───────────────────────────────────────────
-  const fetchParkingLots = async (dong?: string, page = 0) => {
+  const fetchParkingLots = async (
+    keyword?: string, 
+    page = 0,
+    sortBy = filters.sortBy
+  ) => {
     if (!user?.accessToken) return;
 
     setLoading(true);
@@ -45,15 +50,16 @@ export default function ParkingLotsPage() {
     
     try {
       const response = await parkingLotApi.getList(
-        user.accessToken, 
-        dong,
+        user.accessToken,
+        keyword,
         page,
-        ITEMS_PER_PAGE
-    );
+        ITEMS_PER_PAGE,
+        sortBy
+      );
       const lots = response.data.content ?? [];
 
       setParkingLots(lots);
-      applySort(lots, filters);
+      setFilteredLots(lots);
       setTotalPages(response.data.totalPages);
       setTotalElements(response.data.totalElements);
       setCurrentPage(response.data.number + 1);
@@ -93,7 +99,7 @@ export default function ParkingLotsPage() {
         const lots = response.data ?? [];
 
         setParkingLots(lots);
-        applySort(lots, filters);
+        setFilteredLots(lots);
       } catch (err) {
         setError(
           err instanceof Error
@@ -119,35 +125,27 @@ export default function ParkingLotsPage() {
   }, [authLoading, user]);
 
   // ─── 정렬 적용 ───────────────────────────────────────────
-  const applySort = (lots: ParkingLot[], f: FilterOptions) => {
-    let sorted = [...lots];
-    if (f.sortBy === "price") {
-      sorted.sort((a, b) => a.price - b.price);
-    } else {
-      sorted.sort((a, b) => a.name.localeCompare(b.name, "ko"));
-    }
-    setFilteredLots(sorted);
-    setCurrentPage(1);
-  };
+  // const applySort = (lots: ParkingLot[], f: FilterOptions) => {
+  //   let sorted = [...lots];
+  //   if (f.sortBy === "price") {
+  //     sorted.sort((a, b) => a.price - b.price);
+  //   } else {
+  //     sorted.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  //   }
+  //   setFilteredLots(sorted);
+  //   setCurrentPage(1);
+  // };
 
   // ─── 검색 핸들러 (SearchFilters → 프론트 필터) ──────────
   const handleSearch = (query: string) => {
-    if (!query) {
-      applySort(parkingLots, filters);
-      return;
-    }
-    const matched = parkingLots.filter(
-      (l) =>
-        l.name.toLowerCase().includes(query.toLowerCase()) ||
-        l.address.toLowerCase().includes(query.toLowerCase())
-    );
-    applySort(matched, filters);
+    setKeyword(query);
+    fetchParkingLots(query, 0);
   };
 
   // ─── 필터 변경 ───────────────────────────────────────────
   const handleFilterChange = (newFilters: FilterOptions) => {
     setFilters(newFilters);
-    applySort(filteredLots, newFilters);
+    fetchParkingLots(keyword, 0, newFilters.sortBy);
   };
 
   // ─── 페이지네이션 ────────────────────────────────────────
@@ -290,7 +288,7 @@ export default function ParkingLotsPage() {
             <section className="mt-8 flex items-center justify-center gap-2">
               <button
                 type="button"
-                onClick={() => fetchParkingLots(undefined, currentPage - 2)}
+                onClick={() => fetchParkingLots(keyword, currentPage - 2)}
                 disabled={currentPage === 1}
                 className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white text-slate-500 disabled:opacity-50"
               >
@@ -301,7 +299,7 @@ export default function ParkingLotsPage() {
                 <button
                   key={page}
                   type="button"
-                  onClick={() => fetchParkingLots(undefined, page - 1)}
+                  onClick={() => fetchParkingLots(keyword, page - 1)}
                   className={`h-10 w-10 rounded-[10px] text-[18px] font-semibold ${
                     page === currentPage
                       ? "bg-[#2563eb] text-white"
@@ -314,7 +312,7 @@ export default function ParkingLotsPage() {
 
               <button
                 type="button"
-                onClick={() => fetchParkingLots(undefined, currentPage)}
+                onClick={() => fetchParkingLots(keyword, currentPage)}
                 disabled={currentPage === totalPages}
                 className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white text-slate-700 disabled:opacity-50"
               >
