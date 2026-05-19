@@ -36,6 +36,7 @@ export function TimePicker({
     return diff === 2 || diff === 3;
   };
 
+  // 초기 선택 날짜: 첫 번째 활성화된 날짜 (내일)
   const [selectedDate, setSelectedDate] = useState<Date>(dates[0]);
   const [startHour, setStartHour] = useState<number>(0);
   const [duration, setDuration] = useState<number>(1);

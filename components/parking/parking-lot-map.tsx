@@ -1,6 +1,7 @@
 "use client";
 
 import Script from "next/script";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 declare global {
@@ -22,6 +23,7 @@ type ParkingLotMapProps = {
 };
 
 export function ParkingLotMap({ parkingLots }: ParkingLotMapProps) {
+  const router = useRouter();
   const mapRef = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -53,14 +55,18 @@ export function ParkingLotMap({ parkingLots }: ParkingLotMapProps) {
           lot.longitude
         );
 
-        new window.kakao.maps.Marker({
+        const marker = new window.kakao.maps.Marker({
           map,
           position,
           title: lot.name,
         });
+
+        window.kakao.maps.event.addListener(marker, "click", () => {
+          router.push(`/parking-lots/${lot.id}`);
+        });
       });
     });
-  }, [loaded, parkingLots]);
+  }, [loaded, parkingLots, router]);
 
   return (
     <>
