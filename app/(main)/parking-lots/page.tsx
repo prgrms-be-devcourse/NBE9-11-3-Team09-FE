@@ -94,6 +94,9 @@ export default function ParkingLotsPage() {
 
         setParkingLots(lots);
         applySort(lots, filters);
+        setTotalElements(lots.length);
+        setTotalPages(1);
+        setCurrentPage(1);
       } catch (err) {
         setError(
           err instanceof Error
