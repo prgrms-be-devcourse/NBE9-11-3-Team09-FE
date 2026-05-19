@@ -112,12 +112,14 @@ export type ReservationStatus =
   | "PENDING"
   | "CONFIRMED"
   | "COMPLETED"
+  | "FINISHED"
   | "CANCELED";
 
 export const RESERVATION_STATUS_LABELS: Record<ReservationStatus, string> = {
   PENDING: "결제 대기",
   CONFIRMED: "예약 확정",
-  COMPLETED: "이용 완료",
+  COMPLETED: "주차 중",
+  FINISHED: "이용 완료",
   CANCELED: "취소됨",
 };
 
@@ -298,10 +300,10 @@ export interface PageResponse<T> {
   number: number;
 }
 export const parkingLotApi = {
-  getList: (token: string, keyword?: string, page = 0, size = 6, sort = "name") =>
+  getList: (token: string, keyword?: string, page = 0, size = 6) =>
     apiRequest<ApiResponse<PageResponse<ParkingLot>>>(
-      `/parking-lots?page=${page}&size=${size}&sort=${sort}${
-        keyword ? `&keyword=${encodeURIComponent(keyword)}` : ""
+      `/parking-lots?page=${page}&size=${size}${
+      keyword ? `&keyword=${encodeURIComponent(keyword)}` : ""
       }`,
       { token }
     ),

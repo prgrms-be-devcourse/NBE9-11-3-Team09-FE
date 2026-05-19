@@ -94,7 +94,8 @@ export default function ReservationDetailPage() {
     const map: Record<Reservation["status"], string> = {
       PENDING:   "bg-yellow-100 text-yellow-700",
       CONFIRMED: "bg-blue-100 text-blue-700",
-      COMPLETED: "bg-muted text-muted-foreground",
+      COMPLETED: "bg-green-100 text-green-700",
+      FINISHED:  "bg-muted text-muted-foreground",
       CANCELED:  "bg-red-100 text-red-700",
     };
     return map[status] ?? "bg-muted text-muted-foreground";

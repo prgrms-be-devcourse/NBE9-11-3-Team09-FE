@@ -49,7 +49,8 @@ export default function AdminReservationsPage() {
   const STATUS_STYLE: Record<string, string> = {
     PENDING: "bg-yellow-100 text-yellow-700",
     CONFIRMED: "bg-blue-100 text-blue-700",
-    COMPLETED: "bg-slate-100 text-slate-600",
+    COMPLETED: "bg-green-100 text-green-700",
+    FINISHED: "bg-slate-100 text-slate-600",
     CANCELED: "bg-red-100 text-red-700",
   };
 
