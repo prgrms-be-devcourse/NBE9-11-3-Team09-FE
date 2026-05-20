@@ -17,87 +17,115 @@ export function TimePicker({
   onStartTimeChange,
   onEndTimeChange,
 }: TimePickerProps) {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [startHour, setStartHour] = useState<number>(new Date().getHours());
-  const [startMinute, setStartMinute] = useState<number>(0);
-  const [duration, setDuration] = useState<number>(1);
+  const now = new Date();
 
-  const DURATION_OPTIONS = [0.5, 1, 2, 3, 4, 6, 8, 12, 24];
-  const dates = Array.from({ length: 7 }, (_, i) => {
+  // 내일(+1) ~ +6일까지 6일치
+  const dates = Array.from({ length: 6 }, (_, i) => {
     const date = new Date();
-    date.setDate(date.getDate() + i);
+    date.setDate(date.getDate() + i + 1);
     return date;
   });
 
-  const now = new Date();
-  const isToday = selectedDate.toDateString() === now.toDateString();
+  // +2일, +3일은 아직 오픈되지 않은 날짜 - disabled 처리
+  const isDisabledDate = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(date);
+    target.setHours(0, 0, 0, 0);
+    const diff = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return diff === 2 || diff === 3;
+  };
 
-  // 현재 시간 이후의 시간(Hour)만 필터링
-  const hours = Array.from({ length: 24 }, (_, i) => i).filter((h) => {
-    if (!isToday) return true;
-    return h >= now.getHours();
-  });
+  // 초기 선택 날짜: 첫 번째 활성화된 날짜 (내일)
+  const [selectedDate, setSelectedDate] = useState<Date>(dates[0]);
+  const [startHour, setStartHour] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(1);
 
-  // 현재 시간 이후의 분(Minute)만 필터링 (같은 시간대일 경우)
-  const minutes = [0, 10, 20, 30, 40, 50].filter((m) => {
-    if (!isToday || startHour > now.getHours()) return true;
-    return m > now.getMinutes();
-  });
+  const DURATION_OPTIONS = [1, 2, 3, 4, 5, 6, 8, 12];
 
-  // 유효하지 않은 시간이 선택되어 있을 경우 자동 조정
+  // 0~21시만 허용 (종료 시간이 최대 22시)
+  const hours = Array.from({ length: 22 }, (_, i) => i);
+
+  // startHour 기준으로 종료 시간이 22시 이하인 duration만 허용
+  const availableDurations = DURATION_OPTIONS.filter(
+    (d) => startHour + d <= 22
+  );
+
+  // startHour 변경 시 duration이 범위 벗어나면 초기화
   useEffect(() => {
-    if (isToday) {
-      if (startHour < now.getHours()) {
-        setStartHour(now.getHours());
-      }
-      if (startHour === now.getHours() && (minutes.length > 0 && !minutes.includes(startMinute))) {
-        setStartMinute(minutes[0]);
-      }
+    if (startHour + duration > 22) {
+      setDuration(availableDurations[0] ?? 1);
     }
-  }, [selectedDate, startHour, isToday, minutes, startMinute]);
+  }, [startHour]);
 
   const formatDate = (date: Date) => {
     const days = ["일", "월", "화", "수", "목", "금", "토"];
     const month = date.getMonth() + 1;
     const day = date.getDate();
-    if (date.toDateString() === now.toDateString()) return "오늘";
-    if (date.toDateString() === new Date(now.getTime() + 86400000).toDateString()) return "내일";
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    if (date.toDateString() === tomorrow.toDateString()) return "내일";
     return `${month}/${day}(${days[date.getDay()]})`;
   };
 
   useEffect(() => {
     const start = new Date(selectedDate);
-    start.setHours(startHour, startMinute, 0, 0);
+    start.setHours(startHour, 0, 0, 0);
     const end = new Date(start.getTime() + duration * 60 * 60 * 1000);
     onStartTimeChange(start);
     onEndTimeChange(end);
-  }, [selectedDate, startHour, startMinute, duration, onStartTimeChange, onEndTimeChange]);
+  }, [selectedDate, startHour, duration, onStartTimeChange, onEndTimeChange]);
 
   return (
     <div className="space-y-6">
       {/* 날짜 선택 */}
       <div>
-        <label className="flex items-center gap-2 text-sm font-medium mb-3"><Calendar className="w-4 h-4" /> 날짜 선택</label>
+        <label className="flex items-center gap-2 text-sm font-medium mb-3">
+          <Calendar className="w-4 h-4" /> 날짜 선택
+        </label>
         <div className="flex gap-2 overflow-x-auto pb-2">
-          {dates.map((date) => (
-            <button key={date.toISOString()} onClick={() => setSelectedDate(date)}
-              className={cn("px-4 py-3 rounded-xl text-sm font-medium transition-all min-w-[80px]",
-                selectedDate.toDateString() === date.toDateString() ? "bg-foreground text-background" : "bg-muted text-muted-foreground")}>
-              {formatDate(date)}
-            </button>
-          ))}
+          {dates.map((date) => {
+            const disabled = isDisabledDate(date);
+            return (
+              <button
+                key={date.toISOString()}
+                onClick={() => !disabled && setSelectedDate(date)}
+                disabled={disabled}
+                className={cn(
+                  "px-4 py-3 rounded-xl text-sm font-medium transition-all min-w-[80px]",
+                  disabled
+                    ? "bg-muted text-muted-foreground opacity-40 cursor-not-allowed"
+                    : selectedDate.toDateString() === date.toDateString()
+                    ? "bg-foreground text-background"
+                    : "bg-muted text-muted-foreground"
+                )}
+              >
+                {formatDate(date)}
+              </button>
+            );
+          })}
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          ※ 비활성화된 날짜는 전날 22시에 오픈됩니다.
+        </p>
       </div>
 
       {/* 시작 시간 선택 */}
       <div>
-        <label className="flex items-center gap-2 text-sm font-medium mb-3"><Clock className="w-4 h-4" /> 시작 시간</label>
+        <label className="flex items-center gap-2 text-sm font-medium mb-3">
+          <Clock className="w-4 h-4" /> 시작 시간
+        </label>
         <div className="flex gap-2">
-          <select value={startHour} onChange={(e) => setStartHour(Number(e.target.value))} className="flex-1 h-11 px-4 rounded-lg border bg-background">
-            {hours.map((h) => <option key={h} value={h}>{h.toString().padStart(2, "0")}시</option>)}
-          </select>
-          <select value={startMinute} onChange={(e) => setStartMinute(Number(e.target.value))} className="flex-1 h-11 px-4 rounded-lg border bg-background">
-            {minutes.length > 0 ? minutes.map((m) => <option key={m} value={m}>{m.toString().padStart(2, "0")}분</option>) : <option disabled>선택 불가</option>}
+          <select
+            value={startHour}
+            onChange={(e) => setStartHour(Number(e.target.value))}
+            className="flex-1 h-11 px-4 rounded-lg border bg-background"
+          >
+            {hours.map((h) => (
+              <option key={h} value={h}>
+                {h.toString().padStart(2, "0")}시
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -106,15 +134,22 @@ export function TimePicker({
       <div>
         <label className="text-sm font-medium mb-3 block">이용 시간</label>
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-          {DURATION_OPTIONS.map((d) => (
-            <button key={d} onClick={() => setDuration(d)}
-              className={cn("px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                duration === d ? "bg-foreground text-background" : "bg-muted text-muted-foreground")}>
-              {d < 1 ? "30분" : `${d}시간`}
+          {availableDurations.map((d) => (
+            <button
+              key={d}
+              onClick={() => setDuration(d)}
+              className={cn(
+                "px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                duration === d
+                  ? "bg-foreground text-background"
+                  : "bg-muted text-muted-foreground"
+              )}
+            >
+              {`${d}시간`}
             </button>
           ))}
         </div>
       </div>
     </div>
   );
-} 
+}

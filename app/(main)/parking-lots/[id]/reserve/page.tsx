@@ -37,6 +37,15 @@ function formatPrice(value?: number) {
 
 type Step = 1 | 2;
 
+// 개발 환경에서는 시간 제한 해제
+const isDev = true;
+
+function isReservationTime() {
+  if (isDev) return true;
+  const hour = new Date().getHours();
+  return hour >= 22;
+}
+
 export default function ParkingLotReservePage() {
   const params = useParams();
   const router = useRouter();
@@ -53,6 +62,15 @@ export default function ParkingLotReservePage() {
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<Step>(1);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [canReserve, setCanReserve] = useState(isReservationTime());
+
+  // 매 분마다 예약 가능 시간 체크
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCanReserve(isReservationTime());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchParkingLot = useCallback(async () => {
     if (!user?.accessToken) return;
@@ -86,7 +104,6 @@ export default function ParkingLotReservePage() {
     if (!authLoading && user?.accessToken && step === 1) fetchSpots();
   }, [step, fetchSpots, authLoading, user]);
 
-  // SSE 구독 - step 1(자리 선택)에서만 연결, step 2로 가면 끊기
   useEffect(() => {
     if (!user?.accessToken || step !== 1) return;
 
@@ -97,16 +114,12 @@ export default function ParkingLotReservePage() {
     );
 
     eventSource.onmessage = (e) => {
-      // 최초 연결 확인 이벤트는 무시
       if (e.data === "connected") return;
-
       try {
         const updatedSpot = JSON.parse(e.data);
-        // 받은 자리 상태로 spots 배열 업데이트
         setSpots((prev) =>
           prev.map((s) => (s.id === updatedSpot.id ? { ...s, ...updatedSpot } : s))
         );
-        // 내가 선택한 자리가 다른 사람에게 선점됐으면 선택 해제
         setSelectedSpot((prev) => {
           if (prev && prev.id === updatedSpot.id && updatedSpot.status !== "AVAILABLE") {
             return null;
@@ -118,15 +131,14 @@ export default function ParkingLotReservePage() {
       }
     };
 
-  eventSource.onerror = () => {
-    eventSource.close();
-  };
+    eventSource.onerror = () => {
+      eventSource.close();
+    };
 
-  return () => {
-    eventSource.close();
-  };
-}, [parkingLotId, user, step]);
-
+    return () => {
+      eventSource.close();
+    };
+  }, [parkingLotId, user, step]);
 
   const calculateTotalPrice = () => {
     if (!parkingLot || !startTime || !endTime) return 0;
@@ -149,7 +161,6 @@ export default function ParkingLotReservePage() {
     setShowConfirmModal(true);
   };
 
-  // 모달 확인 → 예약 API 호출 → confirm 페이지로 이동
   const handleConfirmReservation = async () => {
     if (!selectedSpot || !startTime || !endTime || !parkingLot || !user?.accessToken) return;
 
@@ -188,7 +199,7 @@ export default function ParkingLotReservePage() {
       router.push("/reservation/confirm");
     } catch (err) {
       setError(err instanceof Error ? err.message : "예약에 실패했습니다.");
-      setShowConfirmModal(true); // 에러 시 모달 다시 열기
+      setShowConfirmModal(true);
     } finally {
       setSubmitting(false);
     }
@@ -227,6 +238,25 @@ export default function ParkingLotReservePage() {
     );
   }
 
+  // 예약 불가 시간 안내
+  if (!canReserve) {
+    return (
+      <div className="min-h-screen bg-[#f3f6fb]">
+        <Header />
+        <div className="mx-auto flex max-w-3xl flex-col items-center px-4 py-20">
+          <Clock3 className="mb-4 h-12 w-12 text-[#2563eb]" />
+          <h2 className="mb-2 text-xl font-bold text-slate-900">현재 예약 가능 시간이 아닙니다</h2>
+          <p className="mb-6 text-center text-slate-500">
+            예약은 매일 <span className="font-semibold text-[#2563eb]">22:00 ~ 24:00</span> 사이에만 가능합니다.
+          </p>
+          <Link href={`/parking-lots/${parkingLotId}`}>
+            <Button variant="outline">주차장 정보로 돌아가기</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#f3f6fb] text-slate-900">
       <Header />
@@ -242,7 +272,6 @@ export default function ParkingLotReservePage() {
           </Link>
         </div>
 
-        {/* 주차장 요약 + 스텝 인디케이터 */}
         <div className="mb-6 rounded-[20px] bg-white px-5 py-5 shadow-[0_4px_14px_rgba(15,23,42,0.06)] md:px-7">
           <h1 className="mb-1 text-[22px] font-extrabold text-slate-900">
             {parkingLot.name}
@@ -283,7 +312,6 @@ export default function ParkingLotReservePage() {
           </div>
         </div>
 
-        {/* Step 1: 자리 선택 */}
         {step === 1 && (
           <div className="rounded-[20px] bg-white px-5 py-6 shadow-[0_4px_14px_rgba(15,23,42,0.06)] md:px-7">
             <div className="mb-4 flex items-center justify-between">
@@ -306,7 +334,6 @@ export default function ParkingLotReservePage() {
           </div>
         )}
 
-        {/* Step 2: 시간 선택 */}
         {step === 2 && (
           <div className="rounded-[20px] bg-white px-5 py-6 shadow-[0_4px_14px_rgba(15,23,42,0.06)] md:px-7">
             <div className="mb-5 flex items-center justify-between">
@@ -335,7 +362,6 @@ export default function ParkingLotReservePage() {
         )}
       </main>
 
-      {/* 하단 고정 바 */}
       <div className="fixed bottom-0 left-0 right-0 border-t border-slate-200 bg-white px-4 py-4 shadow-[0_-4px_20px_rgba(15,23,42,0.08)]">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
           <div>
@@ -367,7 +393,6 @@ export default function ParkingLotReservePage() {
         </div>
       </div>
 
-      {/* 예약 확인 모달 */}
       {showConfirmModal && selectedSpot && startTime && endTime && parkingLot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg border">

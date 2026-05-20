@@ -36,7 +36,7 @@ export default function ReservationDetailPage() {
 
   useEffect(() => { fetchReservation(); }, [fetchReservation]);
 
-    useEffect(() => {
+  useEffect(() => {
     const interval = setInterval(() => {
       fetchReservation();
     }, 10000);
@@ -57,7 +57,6 @@ export default function ReservationDetailPage() {
     }
   };
 
-  // PENDING 예약 → confirm 페이지로 이동
   const handleGoToPayment = () => {
     if (!reservation) return;
     sessionStorage.setItem(
@@ -95,7 +94,8 @@ export default function ReservationDetailPage() {
     const map: Record<Reservation["status"], string> = {
       PENDING:   "bg-yellow-100 text-yellow-700",
       CONFIRMED: "bg-blue-100 text-blue-700",
-      COMPLETED: "bg-muted text-muted-foreground",
+      COMPLETED: "bg-green-100 text-green-700",
+      FINISHED:  "bg-muted text-muted-foreground",
       CANCELED:  "bg-red-100 text-red-700",
     };
     return map[status] ?? "bg-muted text-muted-foreground";
@@ -103,8 +103,15 @@ export default function ReservationDetailPage() {
 
   const canCancel = () => {
     if (!reservation) return false;
-    const minutesBefore = (new Date(reservation.startTime).getTime() - Date.now()) / 60000;
-    return minutesBefore > 30 && (reservation.status === "PENDING" || reservation.status === "CONFIRMED");
+    const startDate = new Date(reservation.startTime);
+    const today = new Date();
+    // 당일 취소 불가 - 예약 날짜가 오늘이면 취소 불가
+    const isSameDay =
+      startDate.getFullYear() === today.getFullYear() &&
+      startDate.getMonth() === today.getMonth() &&
+      startDate.getDate() === today.getDate();
+    if (isSameDay) return false;
+    return reservation.status === "PENDING" || reservation.status === "CONFIRMED";
   };
 
   if (loading) return (
@@ -170,7 +177,6 @@ export default function ReservationDetailPage() {
         </div>
 
         <div className="space-y-3">
-          {/* PENDING 상태 - 결제하기 버튼 */}
           {reservation.status === "PENDING" && (
             <button
               onClick={handleGoToPayment}
@@ -181,8 +187,8 @@ export default function ReservationDetailPage() {
             </button>
           )}
 
-          {/* 취소 버튼 */}
-          {canCancel() && (
+          {/* 취소 버튼 - 당일 취소 불가 */}
+          {canCancel() ? (
             <Button
               variant="outline"
               className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
@@ -190,6 +196,10 @@ export default function ReservationDetailPage() {
             >
               예약 취소
             </Button>
+          ) : (reservation.status === "PENDING" || reservation.status === "CONFIRMED") && (
+            <p className="text-sm text-center text-muted-foreground">
+              당일 예약은 취소할 수 없습니다.
+            </p>
           )}
         </div>
       </main>

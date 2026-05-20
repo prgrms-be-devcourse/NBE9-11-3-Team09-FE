@@ -12,6 +12,12 @@ export interface ApiResponse<T> {
   data: T;
 }
 
+export interface NearbyParkingLot extends ParkingLot {
+  latitude: number;
+  longitude: number;
+  distance: number;
+}
+
 // ─────────────────────────────────────────────
 // VehicleType
 // ─────────────────────────────────────────────
@@ -79,6 +85,8 @@ export interface ParkingLot {
   price: number;
   operationStartTime: string;
   operationEndTime: string;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export type SpotStatus = "AVAILABLE" | "OCCUPIED" | "PARKED" | "PAYING";
@@ -104,12 +112,14 @@ export type ReservationStatus =
   | "PENDING"
   | "CONFIRMED"
   | "COMPLETED"
+  | "FINISHED"
   | "CANCELED";
 
 export const RESERVATION_STATUS_LABELS: Record<ReservationStatus, string> = {
   PENDING: "결제 대기",
   CONFIRMED: "예약 확정",
-  COMPLETED: "이용 완료",
+  COMPLETED: "주차 중",
+  FINISHED: "이용 완료",
   CANCELED: "취소됨",
 };
 
@@ -282,10 +292,25 @@ export const authApi = {
 // ─────────────────────────────────────────────
 // 주차장 API
 // ─────────────────────────────────────────────
+export interface PageResponse<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+}
 export const parkingLotApi = {
-  getList: (token: string, dong?: string) =>
-    apiRequest<ApiResponse<ParkingLot[]>>(
-      `/parking-lots${dong ? `?dong=${encodeURIComponent(dong)}` : ""}`,
+  getList: (token: string, keyword?: string, page = 0, size = 6, sort = "name") =>
+    apiRequest<ApiResponse<PageResponse<ParkingLot>>>(
+      `/parking-lots?page=${page}&size=${size}&sort=${sort}${
+        keyword ? `&keyword=${encodeURIComponent(keyword)}` : ""
+      }`,
+      { token }
+    ),
+
+  getNearby: (token: string, lat: number, lng: number, radius = 1000) =>
+    apiRequest<ApiResponse<NearbyParkingLot[]>>(
+      `/parking-lots/nearby?lat=${lat}&lng=${lng}&radius=${radius}`,
       { token }
     ),
 
@@ -350,8 +375,9 @@ export const adminUserApi = {
 };
 
 export const adminPaymentApi = {
-  getAll: (token: string) =>
-    apiRequest<ApiResponse<AdminPayment[]>>(`/admin/payments`, { token }),
+// adminPaymentApi
+  getAll: (token: string, page = 0, size = 10) =>
+    apiRequest<ApiResponse<PageResponse<AdminPayment>>>(`/admin/payments?page=${page}&size=${size}`, { token }),
 
   getByUser: (token: string, userId: number) =>
     apiRequest<ApiResponse<AdminPayment[]>>(`/admin/payments/${userId}`, { token }),

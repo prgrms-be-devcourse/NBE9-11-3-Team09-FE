@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/header";
 import { ParkingLotCard } from "@/components/parking/parking-lot-card";
 import { SearchFilters, type FilterOptions } from "@/components/parking/search-filters";
 import { parkingLotApi, type ParkingLot } from "@/lib/api";
+import { ParkingLotMap } from "@/components/parking/parking-lot-map";
 import {
   ChevronLeft,
   ChevronRight,
@@ -13,7 +14,9 @@ import {
   AlertCircle,
   MapPin,
   RefreshCw,
+  LocateFixed,
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 
 // 한 페이지에 보여줄 카드 개수
@@ -29,18 +32,37 @@ export default function ParkingLotsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [filters, setFilters] = useState<FilterOptions>({ sortBy: "name", hasAvailable: false });
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
+  const [filters, setFilters] = useState<FilterOptions>({ sortBy: "name,asc", hasAvailable: false });
+  const [keyword, setKeyword] = useState("");
 
   // ─── 목록 조회 ───────────────────────────────────────────
-  const fetchParkingLots = async (dong?: string) => {
+  const fetchParkingLots = async (
+    keyword?: string, 
+    page = 0,
+    sortBy = filters.sortBy
+  ) => {
     if (!user?.accessToken) return;
+
     setLoading(true);
     setError(null);
+    
     try {
-      const response = await parkingLotApi.getList(user.accessToken, dong);
-      const lots = response.data;
+      const response = await parkingLotApi.getList(
+        user.accessToken,
+        keyword,
+        page,
+        ITEMS_PER_PAGE,
+        sortBy
+      );
+      const lots = response.data.content ?? [];
+
       setParkingLots(lots);
-      applySort(lots, filters);
+      setFilteredLots(lots);
+      setTotalPages(response.data.totalPages);
+      setTotalElements(response.data.totalElements);
+      setCurrentPage(response.data.number + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "주차장 목록을 불러오지 못했습니다.");
       setParkingLots([]);
@@ -50,50 +72,83 @@ export default function ParkingLotsPage() {
     }
   };
 
+  const fetchNearbyParkingLots = () => {
+  if (!user?.accessToken) return;
+
+  if (!navigator.geolocation) {
+    setError("이 브라우저는 위치 조회를 지원하지 않습니다.");
+    return;
+  }
+
+  setLoading(true);
+  setError(null);
+
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      try {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+
+        const response = await parkingLotApi.getNearby(
+          user.accessToken,
+          lat,
+          lng,
+          1000
+        );
+
+        const lots = response.data ?? [];
+
+        setParkingLots(lots);
+        setFilteredLots(lots);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "주변 주차장 조회에 실패했습니다."
+        );
+        setParkingLots([]);
+        setFilteredLots([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    () => {
+      setError("현재 위치 권한이 필요합니다.");
+      setLoading(false);
+    }
+  );
+};
+
+
   useEffect(() => {
     if (!authLoading && user?.accessToken) fetchParkingLots();
   }, [authLoading, user]);
 
   // ─── 정렬 적용 ───────────────────────────────────────────
-  const applySort = (lots: ParkingLot[], f: FilterOptions) => {
-    let sorted = [...lots];
-    if (f.sortBy === "price") {
-      sorted.sort((a, b) => a.price - b.price);
-    } else {
-      sorted.sort((a, b) => a.name.localeCompare(b.name, "ko"));
-    }
-    setFilteredLots(sorted);
-    setCurrentPage(1);
-  };
+  // const applySort = (lots: ParkingLot[], f: FilterOptions) => {
+  //   let sorted = [...lots];
+  //   if (f.sortBy === "price") {
+  //     sorted.sort((a, b) => a.price - b.price);
+  //   } else {
+  //     sorted.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  //   }
+  //   setFilteredLots(sorted);
+  //   setCurrentPage(1);
+  // };
 
   // ─── 검색 핸들러 (SearchFilters → 프론트 필터) ──────────
   const handleSearch = (query: string) => {
-    if (!query) {
-      applySort(parkingLots, filters);
-      return;
-    }
-    const matched = parkingLots.filter(
-      (l) =>
-        l.name.toLowerCase().includes(query.toLowerCase()) ||
-        l.address.toLowerCase().includes(query.toLowerCase())
-    );
-    applySort(matched, filters);
+    setKeyword(query);
+    fetchParkingLots(query, 0);
   };
 
   // ─── 필터 변경 ───────────────────────────────────────────
   const handleFilterChange = (newFilters: FilterOptions) => {
     setFilters(newFilters);
-    applySort(filteredLots, newFilters);
+    fetchParkingLots(keyword, 0, newFilters.sortBy);
   };
 
   // ─── 페이지네이션 ────────────────────────────────────────
-  const totalPages = Math.max(1, Math.ceil(filteredLots.length / ITEMS_PER_PAGE));
-
-  const pagedLots = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredLots.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredLots, currentPage]);
-
   const visiblePages = useMemo(() => {
     const maxVisible = 5;
     const start = Math.max(1, currentPage - 2);
@@ -123,7 +178,7 @@ export default function ParkingLotsPage() {
                 <div className="rounded-full bg-white px-5 py-3 text-[15px] font-semibold text-slate-700">
                   전체{" "}
                   <span className="ml-1 text-[18px] text-[#2563eb]">
-                    {parkingLots.length}
+                    {totalElements}
                   </span>
                   개
                 </div>
@@ -168,23 +223,40 @@ export default function ParkingLotsPage() {
         <section className="mt-5 rounded-[20px] bg-white px-5 py-6 shadow-[0_8px_24px_rgba(15,23,42,0.06)] md:px-7">
           <SearchFilters onSearch={handleSearch} onFilterChange={handleFilterChange} />
         </section>
+        {filteredLots.length > 0 && (
+            <section className="mt-5 overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+              <ParkingLotMap parkingLots={filteredLots} />
+            </section>
+          )}
 
         {/* ── 결과 수 + 새로고침 ── */}
         <section className="mt-5 flex items-center justify-between">
           <p className="text-[18px] font-semibold text-slate-900">
             총{" "}
-            <span className="text-[#2563eb]">{filteredLots.length}</span>개의
+            <span className="text-[#2563eb]">{totalElements}</span>개의
             주차장
           </p>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => fetchParkingLots()}
-            disabled={loading}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            새로고침
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={fetchNearbyParkingLots}
+              disabled={loading}
+            >
+              <LocateFixed className="mr-2 h-4 w-4" />
+              내 주변 주차장 찾기
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => fetchParkingLots()}
+              disabled={loading}
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              새로고침
+            </Button>
+          </div>
         </section>
 
         {/* ── 상태별 렌더링 ── */}
@@ -207,16 +279,16 @@ export default function ParkingLotsPage() {
           <>
             {/* ── 카드 그리드 (cus03-04 ParkingLotCard) ── */}
             <section className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {pagedLots.map((lot) => (
-                <ParkingLotCard key={lot.id} parkingLot={lot} />
-              ))}
+            {filteredLots.map((lot) => (
+              <ParkingLotCard key={lot.id} parkingLot={lot} />
+            ))}
             </section>
 
             {/* ── 페이지네이션 (dev) ── */}
             <section className="mt-8 flex items-center justify-center gap-2">
               <button
                 type="button"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                onClick={() => fetchParkingLots(keyword, currentPage - 2)}
                 disabled={currentPage === 1}
                 className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white text-slate-500 disabled:opacity-50"
               >
@@ -227,7 +299,7 @@ export default function ParkingLotsPage() {
                 <button
                   key={page}
                   type="button"
-                  onClick={() => setCurrentPage(page)}
+                  onClick={() => fetchParkingLots(keyword, page - 1)}
                   className={`h-10 w-10 rounded-[10px] text-[18px] font-semibold ${
                     page === currentPage
                       ? "bg-[#2563eb] text-white"
@@ -240,7 +312,7 @@ export default function ParkingLotsPage() {
 
               <button
                 type="button"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() => fetchParkingLots(keyword, currentPage)}
                 disabled={currentPage === totalPages}
                 className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white text-slate-700 disabled:opacity-50"
               >

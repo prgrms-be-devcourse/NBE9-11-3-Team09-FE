@@ -9,9 +9,21 @@ interface ParkingLotCardProps {
   parkingLot: ParkingLot;
 }
 
+function formatDistance(distance: number) {
+  if (distance < 1000) return `${Math.round(distance)}m`;
+  return `${(distance / 1000).toFixed(1)}km`;
+}
+
+
 export function ParkingLotCard({ parkingLot }: ParkingLotCardProps) {
   // 백엔드에 availableSpots 없음 → totalSpot만 표시
   const formatTime = (t: string) => (t ? t.substring(0, 5) : "-");
+
+  const distance =
+  "distance" in parkingLot && typeof parkingLot.distance === "number"
+    ? parkingLot.distance
+    : null;
+
 
   return (
     <Link href={`/parking-lots/${parkingLot.id}`}>
@@ -25,6 +37,11 @@ export function ParkingLotCard({ parkingLot }: ParkingLotCardProps) {
               <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
               <span className="truncate">{parkingLot.address}</span>
             </div>
+            {distance !== null && (
+              <div className="mt-2 inline-flex items-center rounded-full bg-[#eef4ff] px-3 py-1 text-xs font-bold text-[#2563eb]">
+                내 위치에서 {formatDistance(distance)}
+              </div>
+            )}
           </div>
         </div>
 
